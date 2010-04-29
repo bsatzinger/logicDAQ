@@ -2,19 +2,24 @@
 #define BUFFERSIZE 256
 
 //Bits on port B
-#define BMASK B00000011
+//#define BMASK B00000011
 //Bits on port D
-#define DMASK B11111100
+//#define DMASK B11111100
 
-unsigned char buffer[BUFFERSIZE];
+unsigned char Dbuffer[BUFFERSIZE];
+unsigned char Bbuffer[BUFFERSIZE];
+unsigned char Cbuffer[BUFFERSIZE];
+
 unsigned int index;
+
+unsigned char output = 0;
 
 void setup()
 {
   Serial.begin(115200); //opens serial port, sets data rate to 115200 bps
 
-  //for loop to initialize each pin as an input
-  for (int inPin = 2; inPin < 10; inPin++)
+  //for loop to initialize each pin as an input.  pins 2-11 (d2-d7 and b1-b3) are inputs (10)
+  for (int inPin = 2; inPin <= 11; inPin++)
   {
     //set as input
     pinMode(inPin, INPUT);
@@ -22,6 +27,13 @@ void setup()
     //set pullup resistor
     //Causes floating inputs to default to 1 (HIGH)
     digitalWrite(inPin, HIGH);
+  }
+  
+  for (int outPin = 12; outPin <= 19; outPin++)
+  {
+    //set as outputs, with default value low
+     pinMode(outPin, OUTPUT);
+      digitalWrite(outPin, LOW); 
   }
 
   index = 0;
@@ -49,10 +61,16 @@ void loop() //loop to read digital pins 0-13
           for (index = 0; index < BUFFERSIZE; index++)
           {
             //Read 1 byte of digital data
-            buffer[index] = readByte();
+            Dbuffer[index] = PIND;
+            Bbuffer[index] = PINB;
+            Cbuffer[index] = PINC;
             
-            //wait 10 ms
-            delay(10);
+            //if (index % 5 == 0)
+            //{
+               updateOutput(); 
+            //}
+            
+            delay(1);
           }
         
           //Print out the buffer
@@ -70,28 +88,21 @@ void printBuffer()
   //Print each byte from the buffer in hexadecimal on a new line
   for (index = 0; index < BUFFERSIZE; index++)
   {
-    Serial.println(buffer[index], HEX);
+    Serial.println(Dbuffer[index], HEX);
+    Serial.println(Bbuffer[index], HEX);
+    Serial.println(Cbuffer[index], HEX);
   } 
 }
 
-//Combine PINB bits 0 and 1 and PIND bits 7 to 2 to give digital pins 2 to 9 in one byte
-inline char readByte()
+//update the output
+void updateOutput()
 {
-  //Mask off the parts of PINB and PIND
-  //Unsigned is important because shifting behaves differently
-  //for signed and unsigned numbers (the MSB is a sign bit)
-  unsigned char B = PINB & BMASK;
-  unsigned char D = PIND & DMASK;
-
-  //Combine the two parts
-  unsigned char R = B | D;
- 
-   //Rotate two positions to the right to line it up right
-  return (R >> 2) |  (R << 6);
-  
-  //A char has 8 bits.  The bits are the digital IO pins 9 through 2 on the arduino
-  
-  //bit 7  bit 6  bit 5  bit 4  bit 3  bit 2  bit 1  bit 0
-  //pin9   pin 8  pin 7  pin 6  pin 5  pin 4  pin 3  pin 2
- 
+    if (output > 0b00111111)
+    {
+       output = 0; 
+    }
+    
+    
+    PORTC = output & 0b00111111;
+    output++;
 }
