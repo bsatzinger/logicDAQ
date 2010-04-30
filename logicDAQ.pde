@@ -14,6 +14,9 @@ unsigned int index;
 
 unsigned char output = 0;
 
+unsigned char timer2start = 253;
+int recordingTrace = 0;
+
 void setup()
 {
   Serial.begin(115200); //opens serial port, sets data rate to 115200 bps
@@ -35,6 +38,8 @@ void setup()
      pinMode(outPin, OUTPUT);
       digitalWrite(outPin, LOW); 
   }
+
+  SetupTimer2();
 
   index = 0;
 
@@ -58,7 +63,7 @@ void loop() //loop to read digital pins 0-13
       if (inByte == 't')
       {
              //Fill up the buffer
-          for (index = 0; index < BUFFERSIZE; index++)
+          /*for (index = 0; index < BUFFERSIZE; index++)
           {
             //Read 1 byte of digital data
             Dbuffer[index] = PIND;
@@ -72,6 +77,15 @@ void loop() //loop to read digital pins 0-13
             
             delay(1);
           }
+        */
+        
+        index = 0;
+        recordingTrace = 1;
+        
+        while (recordingTrace == 1)
+        {
+           delay(1); 
+        }
         
           //Print out the buffer
           printBuffer();
@@ -92,6 +106,59 @@ void printBuffer()
     Serial.println(Bbuffer[index], HEX);
     Serial.println(Cbuffer[index], HEX);
   } 
+}
+
+void SetupTimer2(void)
+{
+  
+  TCCR2A = 0;
+
+  //256 prescaling
+  TCCR2B = 1<<CS22 | 1<<CS21 | 0<<CS20; 
+
+  //Timer2 Overflow Interrupt Enable   
+  TIMSK2 = 1<<TOIE2;
+
+  //load the timer for its first cycle
+  TCNT2=timer2start; 
+}
+
+ISR(TIMER2_OVF_vect)
+{
+  //Disable interrupts
+  cli();
+  
+  //Currently recording trace?
+  if(recordingTrace == 1)
+  {
+      
+      if (index > (BUFFERSIZE - 1))
+      {
+         //Done recording the trace
+         recordingTrace = 0;
+      }
+      else
+      {
+ 
+          Dbuffer[index] = PIND;
+            Bbuffer[index] = PINB;
+            Cbuffer[index] = PINC;
+            
+            //if (index % 5 == 0)
+            //{
+               updateOutput(); 
+            //}
+
+        index++;
+      }  
+  }
+  
+  
+  //Reset the counter for the next period
+  TCNT2=timer2start;    //TCNT2 = timr2start - TCNT2 might compensate for the (variable) ISR time
+
+  //Enable interrupts
+  sei();
 }
 
 //update the output
